@@ -37,6 +37,9 @@ const CSS = `
   input[type="text"]:focus, input[type="date"]:focus, textarea:focus{
     outline:none; border-color:var(--ink);
   }
+  input::placeholder, textarea::placeholder{
+    color:color-mix(in srgb, var(--muted) 50%, transparent);
+  }
   textarea{ min-height:180px; resize:vertical; font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.85rem; line-height:1.5; }
   .section-title{
     font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:1.4rem;
@@ -142,6 +145,20 @@ const PUBLIC_URL = "${publicUrl}";
 const DOC = ${docJson};
 let pages = DOC ? DOC.pages.map(p => ({ markdown: p.markdown, image_key: p.image_key })) : [];
 let draggedIndex = null;
+
+const titleEl = document.getElementById("title");
+titleEl.addEventListener("input", () => {
+	document.title = titleEl.value ? "~ " + titleEl.value : "~ " + (DOC ? "Edit Document" : "New Document");
+});
+
+const PLACEHOLDERS = [
+	"Your greatest literary work...",
+	"What will you put here?",
+	"A descriptive title? or a fanciful title?",
+	"This is a really awesome placeholder title!",
+	"A book not yet written but with a sick title",
+];
+titleEl.placeholder = PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)];
 
 function toast(msg){
 	const t = document.getElementById("toast");
@@ -394,7 +411,11 @@ export function editorHtml(publicUrl: string, doc?: DocumentData): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${doc ? "Edit" : "New"} — Sharepoint</title>
+<title>${doc ? "~ Edit Document" : "~ New Document"}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="Sharepoint">
+<meta property="og:description" content="Document sharing and viewing">
+<meta property="og:image" content="${publicUrl}/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${FONTS_URL}" rel="stylesheet">
@@ -423,7 +444,7 @@ export function editorHtml(publicUrl: string, doc?: DocumentData): string {
 	<div class="meta-grid">
 		<div class="field">
 			<label for="title">Title</label>
-			<input type="text" id="title" placeholder="Device Layout and Personal Reflection">
+			<input type="text" id="title" placeholder="Your greatest literary work">
 		</div>
 		<div class="field">
 			<label for="date">Date</label>

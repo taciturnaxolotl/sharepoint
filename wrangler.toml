@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 account_id = "fdbe5b542ede643d34962c1f07a34565"
 
+[assets]
+directory = "./public"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "sharepoint"
@@ -13,4 +16,4 @@ binding = "SCANS"
 bucket_name = "sharepoint-scans"
 
 [vars]
-PUBLIC_URL = "http://localhost:8787"
+PUBLIC_URL = "https://share.dunkirk.sh"

@@ -13,13 +13,21 @@ const KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css
 const FONTS_URL =
 	"https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
 
-function htmlShell(title: string, brand: string, content: string): string {
+function htmlShell(title: string, brand: string, content: string, url: string, description?: string): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="description" content="${escapeHtml(description || "A document on Sharepoint")}">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description || "A document on Sharepoint")}">
+<meta property="og:image" content="${url}/og.png">
+<meta property="og:url" content="${url}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${FONTS_URL}" rel="stylesheet">
@@ -169,7 +177,7 @@ export default {
 			if (!doc) return new Response("Document not found", { status: 404 });
 
 			const content = renderDocument(doc);
-			return new Response(htmlShell(doc.title, doc.brand, content), {
+			return new Response(htmlShell(doc.title, doc.brand, content, `${env.PUBLIC_URL}/d/${id}`, doc.date), {
 				headers: { "Content-Type": "text/html;charset=utf-8" },
 			});
 		}
