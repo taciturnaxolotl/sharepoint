@@ -374,7 +374,13 @@ document.getElementById("save").addEventListener("click", async () => {
 	const filledPages = pages.filter(p => p.image_key || p.markdown.trim());
 
 	if (!title || !date || filledPages.length === 0) {
-		toast("Fill in title, date, and add at least one page");
+		const missing = [];
+		if (!title) missing.push("title");
+		if (!date) missing.push("date");
+		if (filledPages.length === 0) missing.push("at least one page");
+		const last = missing.pop();
+		const pretty = missing.length ? missing.join(", ") + ", and " + last : last;
+		toast("Missing " + pretty);
 		return;
 	}
 
