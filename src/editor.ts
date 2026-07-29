@@ -40,6 +40,13 @@ const CSS = `
   input::placeholder, textarea::placeholder{
     color:color-mix(in srgb, var(--muted) 50%, transparent);
   }
+  input[type="date"]::-webkit-datetime-edit{
+    color:color-mix(in srgb, var(--muted) 50%, transparent);
+  }
+  input[type="date"]:focus::-webkit-datetime-edit,
+  input[type="date"].has-value::-webkit-datetime-edit{
+    color:var(--ink);
+  }
   textarea{ min-height:180px; resize:vertical; font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.85rem; line-height:1.5; }
   .section-title{
     font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:1.4rem;
@@ -167,6 +174,12 @@ function toast(msg){
 	toast._t = setTimeout(() => t.classList.remove("show"), 1800);
 }
 
+function syncDateClass(){
+	const d = document.getElementById("date");
+	d.classList.toggle("has-value", !!d.value);
+}
+document.getElementById("date").addEventListener("input", syncDateClass);
+
 function hasImage(p) {
 	return !!(p.image_key || p.objectUrl);
 }
@@ -208,6 +221,7 @@ function addFiles(files, startIndex) {
 		if (!dateEl.value && file.lastModified) {
 			const d = new Date(file.lastModified);
 			dateEl.value = d.toISOString().slice(0, 10);
+			syncDateClass();
 		}
 		index++;
 	}
@@ -251,6 +265,7 @@ function render(){
 	// Only prefill from DOC if the fields are empty (first load)
 	if (!titleEl.value && DOC?.title) titleEl.value = DOC.title;
 	if (!dateEl.value && DOC?.date) dateEl.value = DOC.date;
+	syncDateClass();
 
 	const container = document.getElementById("pages");
 	container.innerHTML = pages.map((p, i) => {
