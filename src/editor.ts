@@ -194,13 +194,30 @@ function stageFile(file, index) {
 	pages[index].objectUrl = URL.createObjectURL(file);
 }
 
-async function uploadFile(file) {
+async function uploadFile(file, signal) {
 	const fd = new FormData();
 	fd.append("file", file);
-	const res = await fetch("/upload", { method: "POST", body: fd });
-	const data = await res.json();
-	if (!data.success) throw new Error("Upload failed");
-	return data.key;
+	let lastErr;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			// Timeout guards against a stalled R2 put hanging the save forever.
+			// Combined with the external signal so a page unload still aborts cleanly.
+			const timeout = AbortSignal.timeout(15000);
+			const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+			const res = await fetch("/upload", { method: "POST", body: fd, signal: combined });
+			if (!res.ok) throw new Error("HTTP " + res.status);
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error || "Upload failed");
+			return data.key;
+		} catch (err) {
+			// A genuine navigation abort (page leaving) can't be retried — bail.
+			// A timeout leaves the external signal untouched, so we retry it.
+			if (signal?.aborted) throw err;
+			lastErr = err;
+			if (attempt < 2) await new Promise(r => setTimeout(r, 300 * 2 ** attempt));
+		}
+	}
+	throw lastErr;
 }
 
 function addFiles(files, startIndex) {
@@ -413,19 +430,20 @@ document.getElementById("save").addEventListener("click", async () => {
 	const saveBtn = document.getElementById("save");
 	saveBtn.disabled = true;
 	const originalLabel = saveBtn.textContent;
+	const controller = new AbortController();
+	// Abort in-flight uploads if the page starts to unload
+	window.addEventListener("pagehide", () => controller.abort(), { once: true });
 
 	try {
-		// Upload any staged files to R2 first
-		const uploaded = [];
-		for (const p of filledPages) {
+		// Upload any staged files to R2 in parallel
+		saveBtn.textContent = "Uploading...";
+		const uploaded = await Promise.all(filledPages.map(async (p) => {
 			if (p.file) {
-				saveBtn.textContent = "Uploading...";
-				const key = await uploadFile(p.file);
-				uploaded.push({ markdown: p.markdown, image_key: key });
-			} else {
-				uploaded.push({ markdown: p.markdown, image_key: p.image_key });
+				const key = await uploadFile(p.file, controller.signal);
+				return { markdown: p.markdown, image_key: key };
 			}
-		}
+			return { markdown: p.markdown, image_key: p.image_key };
+		}));
 
 		saveBtn.textContent = "Saving...";
 		const method = DOC ? "PUT" : "POST";
@@ -435,6 +453,7 @@ document.getElementById("save").addEventListener("click", async () => {
 			method,
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ title, date, pages: uploaded }),
+			signal: controller.signal,
 		});
 		const data = await res.json();
 		if (data.success) {
@@ -446,9 +465,11 @@ document.getElementById("save").addEventListener("click", async () => {
 			saveBtn.textContent = originalLabel;
 		}
 	} catch (err) {
-		toast(err?.message || "Something went wrong");
-		saveBtn.disabled = false;
-		saveBtn.textContent = originalLabel;
+		if (!controller.signal.aborted) {
+			toast(err?.message || "Something went wrong");
+			saveBtn.disabled = false;
+			saveBtn.textContent = originalLabel;
+		}
 	}
 });
 
