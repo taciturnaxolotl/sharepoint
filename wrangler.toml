@@ -15,5 +15,3 @@ database_id = "e51135c2-e507-4030-8d66-a44103e75ce3"
 binding = "SCANS"
 bucket_name = "sharepoint-scans"
 
-[vars]
-PUBLIC_URL = "https://share.dunkirk.sh"

@@ -1,33 +1,44 @@
-import { editorHtml } from "./editor";
 import { nanoid } from "nanoid";
+import { editorHtml } from "./editor";
+import { type DocumentData, type PageData, renderDocument } from "./render";
 import { CSS } from "./styles";
-import { renderDocument, type DocumentData, type PageData } from "./render";
 
 export interface Env {
 	DB: D1Database;
 	SCANS: R2Bucket;
-	PUBLIC_URL: string;
 }
 
-const KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
+const KATEX_CSS =
+	"https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
 const FONTS_URL =
 	"https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
 
-function htmlShell(title: string, content: string, url: string, description?: string): string {
+function htmlShell(
+	title: string,
+	content: string,
+	url: string,
+	date?: string,
+): string {
+	const origin = new URL(url).origin;
+	const fullTitle = `${title}`;
+	const desc = date
+		? `A document on Sharepoint, published ${date}.`
+		: "A document on Sharepoint.";
 	return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(title)}</title>
+<title>${escapeHtml(fullTitle)}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="description" content="${escapeHtml(description || "A document on Sharepoint")}">
-<meta property="og:title" content="${escapeHtml(title)}">
-<meta property="og:description" content="${escapeHtml(description || "A document on Sharepoint")}">
-<meta property="og:image" content="${url}/og.png">
+<meta name="description" content="${escapeHtml(desc)}">
+<meta property="og:site_name" content="Sharepoint">
+<meta property="og:title" content="${escapeHtml(fullTitle)}">
+<meta property="og:description" content="${escapeHtml(desc)}">
+<meta property="og:image" content="${origin}/og.png">
 <meta property="og:url" content="${url}">
 <meta property="og:type" content="article">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${FONTS_URL}" rel="stylesheet">
@@ -112,7 +123,10 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, "&quot;");
 }
 
-async function getDocument(db: D1Database, id: string): Promise<DocumentData | null> {
+async function getDocument(
+	db: D1Database,
+	id: string,
+): Promise<DocumentData | null> {
 	const doc = await db
 		.prepare("SELECT id, title, date FROM documents WHERE id = ?")
 		.bind(id)
@@ -121,19 +135,28 @@ async function getDocument(db: D1Database, id: string): Promise<DocumentData | n
 	if (!doc) return null;
 
 	const { results: pages } = await db
-		.prepare("SELECT position, markdown, image_key FROM pages WHERE document_id = ? ORDER BY position")
+		.prepare(
+			"SELECT position, markdown, image_key FROM pages WHERE document_id = ? ORDER BY position",
+		)
 		.bind(id)
 		.all<PageData>();
 
 	return { ...doc, pages: pages || [] };
 }
 
-async function handleUpload(request: Request, env: Env): Promise<Response> {
+async function handleUpload(
+	request: Request,
+	env: Env,
+	origin: string,
+): Promise<Response> {
 	const formData = await request.formData();
 	const file = formData.get("file") as File | null;
 
 	if (!file) {
-		return Response.json({ success: false, error: "No file provided" }, { status: 400 });
+		return Response.json(
+			{ success: false, error: "No file provided" },
+			{ status: 400 },
+		);
 	}
 
 	const key = `${nanoid()}.svg`;
@@ -143,7 +166,7 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
 		httpMetadata: { contentType: file.type || "image/svg+xml" },
 	});
 
-	return Response.json({ success: true, key, url: `${env.PUBLIC_URL}/i/${key}` });
+	return Response.json({ success: true, key, url: `${origin}/i/${key}` });
 }
 
 export default {
@@ -165,7 +188,7 @@ export default {
 
 		// Upload scan image
 		if (path === "/upload" && request.method === "POST") {
-			return handleUpload(request, env);
+			return handleUpload(request, env, url.origin);
 		}
 
 		// Serve scan images from R2
@@ -189,14 +212,17 @@ export default {
 			if (!doc) return new Response("Document not found", { status: 404 });
 
 			const content = renderDocument(doc);
-			return new Response(htmlShell(doc.title, content, `${env.PUBLIC_URL}/d/${id}`, doc.date), {
-				headers: { "Content-Type": "text/html;charset=utf-8" },
-			});
+			return new Response(
+				htmlShell(doc.title, content, `${url.origin}/d/${id}`, doc.date),
+				{
+					headers: { "Content-Type": "text/html;charset=utf-8" },
+				},
+			);
 		}
 
 		// Editor UI (new document)
 		if (path === "/new" || path === "/") {
-			return new Response(editorHtml(env.PUBLIC_URL), {
+			return new Response(editorHtml(url.origin), {
 				headers: { "Content-Type": "text/html;charset=utf-8" },
 			});
 		}
@@ -206,7 +232,7 @@ export default {
 			const id = path.slice(6);
 			const doc = await getDocument(env.DB, id);
 			if (!doc) return new Response("Document not found", { status: 404 });
-			return new Response(editorHtml(env.PUBLIC_URL, doc), {
+			return new Response(editorHtml(url.origin, doc), {
 				headers: { "Content-Type": "text/html;charset=utf-8" },
 			});
 		}
@@ -223,7 +249,7 @@ export default {
 			const now = Math.floor(Date.now() / 1000);
 
 			await env.DB.prepare(
-				"INSERT INTO documents (id, title, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+				"INSERT INTO documents (id, title, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
 			)
 				.bind(id, body.title, body.date, now, now)
 				.run();
@@ -231,13 +257,13 @@ export default {
 			for (let i = 0; i < body.pages.length; i++) {
 				const page = body.pages[i]!;
 				await env.DB.prepare(
-					"INSERT INTO pages (id, document_id, position, markdown, image_key, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+					"INSERT INTO pages (id, document_id, position, markdown, image_key, created_at) VALUES (?, ?, ?, ?, ?, ?)",
 				)
 					.bind(nanoid(), id, i, page.markdown, page.image_key, now)
 					.run();
 			}
 
-			return Response.json({ success: true, id, url: `${env.PUBLIC_URL}/d/${id}` });
+			return Response.json({ success: true, id, url: `${url.origin}/d/${id}` });
 		}
 
 		// API: update document
@@ -252,27 +278,27 @@ export default {
 			const now = Math.floor(Date.now() / 1000);
 
 			await env.DB.prepare(
-				"UPDATE documents SET title = ?, date = ?, updated_at = ? WHERE id = ?"
+				"UPDATE documents SET title = ?, date = ?, updated_at = ? WHERE id = ?",
 			)
 				.bind(body.title, body.date, now, id)
 				.run();
 
-			await env.DB.prepare("DELETE FROM pages WHERE document_id = ?").bind(id).run();
+			await env.DB.prepare("DELETE FROM pages WHERE document_id = ?")
+				.bind(id)
+				.run();
 
 			for (let i = 0; i < body.pages.length; i++) {
 				const page = body.pages[i]!;
 				await env.DB.prepare(
-					"INSERT INTO pages (id, document_id, position, markdown, image_key, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+					"INSERT INTO pages (id, document_id, position, markdown, image_key, created_at) VALUES (?, ?, ?, ?, ?, ?)",
 				)
 					.bind(nanoid(), id, i, page.markdown, page.image_key, now)
 					.run();
 			}
 
-			return Response.json({ success: true, id, url: `${env.PUBLIC_URL}/d/${id}` });
+			return Response.json({ success: true, id, url: `${url.origin}/d/${id}` });
 		}
 
 		return new Response("Not found", { status: 404 });
 	},
 };
-
-

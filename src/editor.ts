@@ -146,9 +146,8 @@ const CSS = `
   }
 `;
 
-function clientJs(publicUrl: string, docJson: string): string {
+function clientJs(docJson: string): string {
 	return `
-const PUBLIC_URL = "${publicUrl}";
 const DOC = ${docJson};
 let pages = DOC ? DOC.pages.map(p => ({ markdown: p.markdown, image_key: p.image_key, file: null, objectUrl: "" })) : [];
 let draggedIndex = null;
