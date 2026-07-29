@@ -43,7 +43,6 @@ export interface DocumentData {
 	id: string;
 	title: string;
 	date: string;
-	brand: string;
 	pages: PageData[];
 }
 

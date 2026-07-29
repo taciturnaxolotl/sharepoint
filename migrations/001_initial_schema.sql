@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   date TEXT NOT NULL,
-  brand TEXT NOT NULL DEFAULT 'Grimoire',
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );

@@ -13,7 +13,7 @@ const KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css
 const FONTS_URL =
 	"https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
 
-function htmlShell(title: string, brand: string, content: string, url: string, description?: string): string {
+function htmlShell(title: string, content: string, url: string, description?: string): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -40,7 +40,7 @@ function htmlShell(title: string, brand: string, content: string, url: string, d
 		<svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
 			<path d="M2 1.5h14v17l-7-4.4-7 4.4v-17Z" fill="currentColor"/>
 		</svg>
-		<span>${escapeHtml(brand)}</span>
+		<span>Sharepoint</span>
 	</a>
 	<div class="actions">
 		<button class="btn" id="copyLink">
@@ -125,7 +125,7 @@ async function getDocument(db: D1Database, id: string): Promise<DocumentData | n
 		.bind(id)
 		.all<PageData>();
 
-	return { ...doc, brand: "Sharepoint", pages: pages || [] };
+	return { ...doc, pages: pages || [] };
 }
 
 async function handleUpload(request: Request, env: Env): Promise<Response> {
@@ -189,7 +189,7 @@ export default {
 			if (!doc) return new Response("Document not found", { status: 404 });
 
 			const content = renderDocument(doc);
-			return new Response(htmlShell(doc.title, doc.brand, content, `${env.PUBLIC_URL}/d/${id}`, doc.date), {
+			return new Response(htmlShell(doc.title, content, `${env.PUBLIC_URL}/d/${id}`, doc.date), {
 				headers: { "Content-Type": "text/html;charset=utf-8" },
 			});
 		}
