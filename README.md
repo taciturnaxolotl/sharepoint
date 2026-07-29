@@ -1,6 +1,8 @@
 # sharepoint
 
-reimplementation of remarkable's quickshare urls
+This is a reimplementation of remarkable's quickshare urls which are wonderful but have a limited lifetime of about 30 days. I wanted to be able to keep mine around for much longer so I built this!
+
+![screenshot of the page](https://l4.dunkirk.sh/i/uilWzM1DTgny.webp)
 
 The canonical repo for this is hosted on tangled over at [`dunkirk.sh/sharepoint`](https://tangled.org/dunkirk.sh/sharepoint)
 
