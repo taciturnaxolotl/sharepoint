@@ -143,7 +143,7 @@ function clientJs(publicUrl: string, docJson: string): string {
 	return `
 const PUBLIC_URL = "${publicUrl}";
 const DOC = ${docJson};
-let pages = DOC ? DOC.pages.map(p => ({ markdown: p.markdown, image_key: p.image_key })) : [];
+let pages = DOC ? DOC.pages.map(p => ({ markdown: p.markdown, image_key: p.image_key, file: null, objectUrl: "" })) : [];
 let draggedIndex = null;
 
 const titleEl = document.getElementById("title");
@@ -167,34 +167,43 @@ function toast(msg){
 	toast._t = setTimeout(() => t.classList.remove("show"), 1800);
 }
 
-async function uploadFile(file, index) {
+function hasImage(p) {
+	return !!(p.image_key || p.objectUrl);
+}
+
+function previewSrc(p) {
+	return p.objectUrl || ("/i/" + p.image_key);
+}
+
+function stageFile(file, index) {
+	if (pages[index].objectUrl) URL.revokeObjectURL(pages[index].objectUrl);
+	pages[index].file = file;
+	pages[index].objectUrl = URL.createObjectURL(file);
+}
+
+async function uploadFile(file) {
 	const fd = new FormData();
 	fd.append("file", file);
 	const res = await fetch("/upload", { method: "POST", body: fd });
 	const data = await res.json();
-	if (data.success) {
-		pages[index].image_key = data.key;
-		render();
-		toast("Scan uploaded");
-	} else {
-		toast("Upload failed");
-	}
+	if (!data.success) throw new Error("Upload failed");
+	return data.key;
 }
 
-async function uploadFiles(files, startIndex) {
+function addFiles(files, startIndex) {
 	let index = startIndex;
 	const dateEl = document.getElementById("date");
 	for (const file of files) {
 		while (index >= pages.length) {
-			pages.push({ markdown: "", image_key: "" });
+			pages.push({ markdown: "", image_key: "", file: null, objectUrl: "" });
 		}
-		while (index < pages.length && pages[index].image_key) {
+		while (index < pages.length && hasImage(pages[index])) {
 			index++;
 			while (index >= pages.length) {
-				pages.push({ markdown: "", image_key: "" });
+				pages.push({ markdown: "", image_key: "", file: null, objectUrl: "" });
 			}
 		}
-		await uploadFile(file, index);
+		stageFile(file, index);
 		// Prefill date from first file's lastModified
 		if (!dateEl.value && file.lastModified) {
 			const d = new Date(file.lastModified);
@@ -202,8 +211,8 @@ async function uploadFiles(files, startIndex) {
 		}
 		index++;
 	}
-	if (pages.length === 0 || pages[pages.length - 1].image_key) {
-		pages.push({ markdown: "", image_key: "" });
+	if (pages.length === 0 || hasImage(pages[pages.length - 1])) {
+		pages.push({ markdown: "", image_key: "", file: null, objectUrl: "" });
 	}
 	render();
 }
@@ -226,7 +235,7 @@ function parseAndDistribute(text, startIndex) {
 	let pageIdx = startIndex;
 	for (const section of sections) {
 		// Find the next page with an image starting from pageIdx
-		while (pageIdx < pages.length && !pages[pageIdx].image_key) pageIdx++;
+		while (pageIdx < pages.length && !hasImage(pages[pageIdx])) pageIdx++;
 		if (pageIdx >= pages.length) break; // drop extras
 		pages[pageIdx].markdown = section;
 		pageIdx++;
@@ -245,7 +254,7 @@ function render(){
 
 	const container = document.getElementById("pages");
 	container.innerHTML = pages.map((p, i) => {
-		if (!p.image_key) {
+		if (!hasImage(p)) {
 			return \`
 				<label class="page-card empty" data-index="\${i}">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -268,7 +277,7 @@ function render(){
 					<textarea data-field="markdown" data-index="\${i}" placeholder="Paste transcribed markdown here...">\${p.markdown}</textarea>
 				</div>
 				<div class="page-preview">
-					<img src="/i/\${p.image_key}" alt="Scan">
+					<img src="\${previewSrc(p)}" alt="Scan">
 					<label class="replace-btn">Replace scan<input type="file" accept="image/*,.svg" data-index="\${i}" multiple></label>
 				</div>
 			</div>
@@ -288,15 +297,17 @@ function render(){
 	});
 	container.querySelectorAll('[data-action="remove"]').forEach(b => {
 		b.addEventListener("click", e => {
+			const p = pages[+e.target.dataset.index];
+			if (p && p.objectUrl) URL.revokeObjectURL(p.objectUrl);
 			pages.splice(+e.target.dataset.index, 1);
 			render();
 		});
 	});
 	container.querySelectorAll('input[type="file"]').forEach(f => {
-		f.addEventListener("change", async e => {
+		f.addEventListener("change", e => {
 			const files = Array.from(e.target.files);
 			if (!files.length) return;
-			await uploadFiles(files, +e.target.dataset.index);
+			addFiles(files, +e.target.dataset.index);
 		});
 	});
 
@@ -326,17 +337,17 @@ function render(){
 			zone.classList.add("dragover");
 		});
 		zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
-		zone.addEventListener("drop", async e => {
+		zone.addEventListener("drop", e => {
 			e.preventDefault();
 			zone.classList.remove("dragover");
 			const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.name.endsWith(".svg"));
 			if (!files.length) return;
-			await uploadFiles(files, +zone.dataset.index);
+			addFiles(files, +zone.dataset.index);
 		});
 	});
 }
 
-window.addEventListener("paste", async e => {
+window.addEventListener("paste", e => {
 	const items = e.clipboardData?.items;
 	if (!items) return;
 	const files = [];
@@ -347,8 +358,8 @@ window.addEventListener("paste", async e => {
 		}
 	}
 	if (files.length) {
-		const emptyIndex = pages.findIndex(p => !p.image_key);
-		await uploadFiles(files, emptyIndex === -1 ? pages.length : emptyIndex);
+		const emptyIndex = pages.findIndex(p => !hasImage(p));
+		addFiles(files, emptyIndex === -1 ? pages.length : emptyIndex);
 	}
 });
 
@@ -371,7 +382,7 @@ document.getElementById("save").addEventListener("click", async () => {
 	const title = document.getElementById("title").value;
 	const date = document.getElementById("date").value;
 
-	const filledPages = pages.filter(p => p.image_key || p.markdown.trim());
+	const filledPages = pages.filter(p => hasImage(p) || p.markdown.trim());
 
 	if (!title || !date || filledPages.length === 0) {
 		const missing = [];
@@ -384,24 +395,49 @@ document.getElementById("save").addEventListener("click", async () => {
 		return;
 	}
 
-	const method = DOC ? "PUT" : "POST";
-	const url = DOC ? "/api/docs/" + DOC.id : "/api/docs";
+	const saveBtn = document.getElementById("save");
+	saveBtn.disabled = true;
+	const originalLabel = saveBtn.textContent;
 
-	const res = await fetch(url, {
-		method,
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ title, date, pages: filledPages }),
-	});
-	const data = await res.json();
-	if (data.success) {
-		toast("Saved!");
-		setTimeout(() => location.href = data.url, 800);
-	} else {
-		toast("Save failed");
+	try {
+		// Upload any staged files to R2 first
+		const uploaded = [];
+		for (const p of filledPages) {
+			if (p.file) {
+				saveBtn.textContent = "Uploading...";
+				const key = await uploadFile(p.file);
+				uploaded.push({ markdown: p.markdown, image_key: key });
+			} else {
+				uploaded.push({ markdown: p.markdown, image_key: p.image_key });
+			}
+		}
+
+		saveBtn.textContent = "Saving...";
+		const method = DOC ? "PUT" : "POST";
+		const url = DOC ? "/api/docs/" + DOC.id : "/api/docs";
+
+		const res = await fetch(url, {
+			method,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title, date, pages: uploaded }),
+		});
+		const data = await res.json();
+		if (data.success) {
+			toast("Saved!");
+			setTimeout(() => location.href = data.url, 800);
+		} else {
+			toast(data.error || "Save failed");
+			saveBtn.disabled = false;
+			saveBtn.textContent = originalLabel;
+		}
+	} catch (err) {
+		toast(err?.message || "Something went wrong");
+		saveBtn.disabled = false;
+		saveBtn.textContent = originalLabel;
 	}
 });
 
-if (pages.length === 0) pages.push({ markdown: "", image_key: "" });
+if (pages.length === 0) pages.push({ markdown: "", image_key: "", file: null, objectUrl: "" });
 render();
 `;
 }
