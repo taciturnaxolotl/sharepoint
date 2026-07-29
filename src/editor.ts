@@ -7,7 +7,7 @@ const CSS = `
   :root{
     --paper:#F3EFE6; --paper-2:#FBF9F3; --ink:#1C1B19; --ink-soft:#37342F;
     --muted:#77726A; --rule:#D9D2C5; --rule-soft:#E7E1D5;
-    --blue:#2C6DF5; --radius:10px;
+    --blue:#2559F4; --blue-hover:#1242D4; --radius:10px;
   }
   *{ box-sizing:border-box; }
   body{ margin:0; background:var(--paper); color:var(--ink-soft); font-family:"Inter",system-ui,sans-serif; font-size:15px; line-height:1.5; }
@@ -18,7 +18,7 @@ const CSS = `
   .icon-btn{
     width:38px; height:38px;
     display:inline-flex; align-items:center; justify-content:center;
-    border:0; border-radius:8px;
+    border:0; border-radius:6px;
     background:transparent; color:var(--muted);
     cursor:pointer;
     transition:background .15s ease, color .15s ease;
@@ -103,7 +103,7 @@ const CSS = `
 
   .btn{
     font:inherit; font-size:.92rem; font-weight:500; border:0; cursor:pointer;
-    border-radius:8px; padding:9px 16px; display:inline-flex; align-items:center; gap:8px;
+    border-radius:6px; padding:9px 16px; display:inline-flex; align-items:center; gap:8px;
     color:#fff; background:var(--ink);
     transition:filter .15s ease, transform .1s ease, background .2s ease;
   }
@@ -113,16 +113,18 @@ const CSS = `
   .btn.copied svg{ transform:scale(1.15); }
   .btn svg{ display:block; transition:transform .2s ease; }
   .btn.secondary{ background:var(--muted); }
+  .btn.publish{ background:var(--blue); }
+  .btn.publish:hover{ background:var(--blue-hover); }
   .btn.ghost{
     background:transparent;
     color:var(--ink);
-    border:1px solid var(--rule);
+    border:0;
   }
-  .btn.ghost:hover,
-  .btn.ghost:active{ border-color:color-mix(in srgb, var(--ink) 18%, var(--rule)); }
+  .btn.ghost:hover{ background:rgba(28,27,25,.05); }
+  .btn.ghost:active{ background:transparent; }
   .toast{
     position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(12px);
-    background:var(--ink); color:#fff; font-size:.88rem; padding:9px 16px; border-radius:8px;
+    background:var(--ink); color:#fff; font-size:.88rem; padding:9px 16px; border-radius:6px;
     opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -164,6 +166,7 @@ async function uploadFile(file, index) {
 
 async function uploadFiles(files, startIndex) {
 	let index = startIndex;
+	const dateEl = document.getElementById("date");
 	for (const file of files) {
 		while (index >= pages.length) {
 			pages.push({ markdown: "", image_key: "" });
@@ -175,6 +178,11 @@ async function uploadFiles(files, startIndex) {
 			}
 		}
 		await uploadFile(file, index);
+		// Prefill date from first file's lastModified
+		if (!dateEl.value && file.lastModified) {
+			const d = new Date(file.lastModified);
+			dateEl.value = d.toISOString().slice(0, 10);
+		}
 		index++;
 	}
 	if (pages.length === 0 || pages[pages.length - 1].image_key) {
@@ -183,9 +191,40 @@ async function uploadFiles(files, startIndex) {
 	render();
 }
 
+function parseAndDistribute(text, startIndex) {
+	let md = text.trim();
+	const titleEl = document.getElementById("title");
+
+	// Extract # Title from the top
+	const titleMatch = md.match(/^#\\s+(.+?)(\\n|$)/);
+	if (titleMatch) {
+		if (!titleEl.value) titleEl.value = titleMatch[1].trim();
+		md = md.slice(titleMatch[0].length).trim();
+	}
+
+	// Split on --- delimiters
+	const sections = md.split(/^---\\s*$/m).map(s => s.trim()).filter(Boolean);
+
+	// Distribute to existing pages with images
+	let pageIdx = startIndex;
+	for (const section of sections) {
+		// Find the next page with an image starting from pageIdx
+		while (pageIdx < pages.length && !pages[pageIdx].image_key) pageIdx++;
+		if (pageIdx >= pages.length) break; // drop extras
+		pages[pageIdx].markdown = section;
+		pageIdx++;
+	}
+
+	render();
+	toast("Distributed " + sections.length + " page" + (sections.length > 1 ? "s" : ""));
+}
+
 function render(){
-	document.getElementById("title").value = DOC?.title || "";
-	document.getElementById("date").value = DOC?.date || "";
+	const titleEl = document.getElementById("title");
+	const dateEl = document.getElementById("date");
+	// Only prefill from DOC if the fields are empty (first load)
+	if (!titleEl.value && DOC?.title) titleEl.value = DOC.title;
+	if (!dateEl.value && DOC?.date) dateEl.value = DOC.date;
 
 	const container = document.getElementById("pages");
 	container.innerHTML = pages.map((p, i) => {
@@ -222,6 +261,12 @@ function render(){
 	container.querySelectorAll("textarea").forEach(t => {
 		t.addEventListener("input", e => {
 			pages[+e.target.dataset.index].markdown = e.target.value;
+		});
+		t.addEventListener("paste", e => {
+			const text = e.clipboardData?.getData("text");
+			if (!text || !text.includes("---")) return;
+			e.preventDefault();
+			parseAndDistribute(text, +t.dataset.index);
 		});
 	});
 	container.querySelectorAll('[data-action="remove"]').forEach(b => {
@@ -369,7 +414,7 @@ export function editorHtml(publicUrl: string, doc?: DocumentData): string {
 			Copy prompt
 		</button>
 		${viewLink}
-		<button class="btn" id="save">${doc ? "Update" : "Publish"}</button>
+		<button class="btn publish" id="save">${doc ? "Update" : "Publish"}</button>
 	</div>
 </header>
 <div class="container">
@@ -389,14 +434,18 @@ export function editorHtml(publicUrl: string, doc?: DocumentData): string {
 	<h2 class="section-title">Pages</h2>
 	<div class="pages" id="pages"></div>
 </div>
-<pre id="promptText" style="display:none;">Transcribe this handwritten page into clean markdown. Rules:
+<pre id="promptText" style="display:none;">Transcribe these handwritten pages into clean markdown. Rules:
 
+- Start with a # heading as the document title
 - Use ## for section headings
 - Use - for bullet points
-- Use $...$ for inline math and $$...$$ for display math
-- Use \`\`\` for code blocks and ASCII diagrams
+- Use $...$ for inline LaTeX and $$...$$ for display LaTeX
+- Use \`\`\` for code blocks
+- Fix any spelling mistakes rather than transcribing them literally
 - Keep the tone and meaning faithful to the original
-- Output only the markdown, no commentary</pre>
+- If there are sketches or images describe them; if they are easily drawn with an ascii diagram then provide one in a code block otherwise just describe it. Don't mistake special symbols for drawings though.
+- If multiple images are provided, separate each page's transcription with --- on its own line
+- Output only the markdown, no commentary, enclose in a codeblock for ease of copying</pre>
 <div class="toast" id="toast"></div>
 
 <script>${clientJs(publicUrl, docJson)}</script>

@@ -57,6 +57,8 @@ export function renderDocument(doc: DocumentData): string {
 		const content = renderMarkdown(page.markdown);
 		const imageUrl = `/i/${page.image_key}`;
 
+		const ext = page.image_key?.split(".").pop()?.toUpperCase() || "Image";
+
 		return `
 			<section class="spread">
 				<div class="prose">
@@ -66,9 +68,17 @@ export function renderDocument(doc: DocumentData): string {
 				<aside class="scan">
 					<div class="scan__meta"><span class="scan__page">Page ${i + 1} / ${doc.pages.length}</span></div>
 					<div class="scan__canvas">
-						<button class="icon-btn scan__dl" data-dl="${i}" aria-label="Download page ${i + 1}">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-						</button>
+						<div class="scan__menu">
+							<button class="scan__menu-btn" aria-label="Page options">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+							</button>
+							<div class="scan__menu-dropdown">
+								<button data-dl="${i}">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+									Download ${ext}
+								</button>
+							</div>
+						</div>
 						<img src="${imageUrl}" alt="Handwritten page scan" loading="lazy">
 					</div>
 				</aside>

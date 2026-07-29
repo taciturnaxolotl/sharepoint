@@ -66,14 +66,30 @@ document.getElementById("copyLink").addEventListener("click", async () => {
 	} catch { toast("Copy failed"); delete btn.dataset.busy; }
 });
 document.getElementById("reader").addEventListener("click", (e) => {
-	const btn = e.target.closest("[data-dl]");
-	if(!btn) return;
-	const img = btn.closest(".scan__canvas").querySelector("img");
-	if(!img) { toast("No scan on this page"); return; }
-	const a = document.createElement("a");
-	a.href = img.src;
-	a.download = img.src.split("/").pop() || "page.svg";
-	a.click();
+	// Toggle menu
+	const menuBtn = e.target.closest(".scan__menu-btn");
+	if (menuBtn) {
+		const dropdown = menuBtn.nextElementSibling;
+		document.querySelectorAll(".scan__menu-dropdown.open").forEach(d => {
+			if (d !== dropdown) d.classList.remove("open");
+		});
+		dropdown.classList.toggle("open");
+		return;
+	}
+	// Download action
+	const dlBtn = e.target.closest("[data-dl]");
+	if (dlBtn) {
+		const img = dlBtn.closest(".scan__canvas").querySelector("img");
+		if (!img) { toast("No scan on this page"); return; }
+		const a = document.createElement("a");
+		a.href = img.src;
+		a.download = img.src.split("/").pop() || "page.svg";
+		a.click();
+		dlBtn.closest(".scan__menu-dropdown").classList.remove("open");
+		return;
+	}
+	// Close menus on outside click
+	document.querySelectorAll(".scan__menu-dropdown.open").forEach(d => d.classList.remove("open"));
 });
 </script>
 </body>
