@@ -174,6 +174,12 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
+		// Normalize trailing slashes (except root) with a redirect
+		if (path !== "/" && path.endsWith("/")) {
+			url.pathname = path.replace(/\/+$/, "");
+			return Response.redirect(url.toString(), 301);
+		}
+
 		// Handle CORS preflight
 		if (request.method === "OPTIONS") {
 			return new Response(null, {
