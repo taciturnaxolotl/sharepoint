@@ -151,6 +151,18 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
+		// Handle CORS preflight
+		if (request.method === "OPTIONS") {
+			return new Response(null, {
+				headers: {
+					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+					"Access-Control-Allow-Headers": "Content-Type",
+					"Access-Control-Max-Age": "86400",
+				},
+			});
+		}
+
 		// Upload scan image
 		if (path === "/upload" && request.method === "POST") {
 			return handleUpload(request, env);
