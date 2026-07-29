@@ -1,0 +1,16 @@
+name = "sharepoint"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id = "fdbe5b542ede643d34962c1f07a34565"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sharepoint"
+database_id = "e51135c2-e507-4030-8d66-a44103e75ce3"
+
+[[r2_buckets]]
+binding = "SCANS"
+bucket_name = "sharepoint-scans"
+
+[vars]
+PUBLIC_URL = "http://localhost:8787"
