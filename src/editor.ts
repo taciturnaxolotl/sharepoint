@@ -546,7 +546,7 @@ export function editorHtml(publicUrl: string, doc?: DocumentData): string {
 - Output only the markdown, no commentary, enclose in a codeblock for ease of copying</pre>
 <div class="toast" id="toast"></div>
 
-<script>${clientJs(publicUrl, docJson)}</script>
+<script>${clientJs(docJson)}</script>
 </body>
 </html>`;
 }
