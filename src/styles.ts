@@ -224,6 +224,36 @@ export const CSS = `
   }
   .prose pre code{ background:none; padding:0; font:inherit; }
 
+  .prose table{
+    display:block;
+    width:100%;
+    overflow-x:auto;
+    border-collapse:collapse;
+    font-size:.92rem;
+    line-height:1.45;
+    margin:1.35em 0;
+  }
+  .prose thead th{
+    font-weight:500;
+    font-size:.78rem;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--muted);
+    text-align:left;
+    white-space:nowrap;
+    padding:0 14px .5em 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .prose tbody td{
+    padding:.55em 14px .55em 0;
+    border-bottom:1px solid var(--rule-soft);
+    vertical-align:top;
+  }
+  .prose tbody tr:last-child td{ border-bottom:0; }
+  .prose th:last-child, .prose td:last-child{ padding-right:0; }
+  .prose td[align="right"], .prose th[align="right"]{ text-align:right; }
+  .prose td[align="center"], .prose th[align="center"]{ text-align:center; }
+
   .prose .katex{ font-size:1.04em; }
   .prose .katex-display{
     margin:1.2em 0;
