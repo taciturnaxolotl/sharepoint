@@ -211,6 +211,16 @@ export default {
 			return new Response(object.body, { headers });
 		}
 
+		// Editor UI (share url + /edit)
+		if (path.startsWith("/d/") && path.endsWith("/edit")) {
+			const id = path.slice(3, -5);
+			const doc = await getDocument(env.DB, id);
+			if (!doc) return new Response("Document not found", { status: 404 });
+			return new Response(editorHtml(url.origin, doc), {
+				headers: { "Content-Type": "text/html;charset=utf-8" },
+			});
+		}
+
 		// Reader view
 		if (path.startsWith("/d/")) {
 			const id = path.slice(3);
